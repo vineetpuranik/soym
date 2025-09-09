@@ -41,4 +41,13 @@ In our project, firmware will:
   Every memory write or port access your firmware does is handled by QEMU’s device models (VGA, PS/2 keyboard, PIT, serial, etc.).
   This means: even though you’re running on your laptop, your firmware is controlling a fully virtual computer inside QEMU.
 
+* Create boot.asm
 
+* Install NASM (assembler) : sudo apt install nasm -y
+
+* Assemble the firmware into kernel.bin : nasm -f bin boot.asm -o kernel.bin
+
+* Check the file size is exactly 512 bytes : ls -l kernel.bin => -rw-rw-r-- 1 vinca vinca 512 Sep  9 10:57 kernel.bin
+
+* Boot it in QEMU
+qemu-system-x86_64 -drive format=raw,file=kernel.bin -nographic -serial mon:stdio
