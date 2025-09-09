@@ -1,3 +1,5 @@
+## Host system details
+
 Host operating system and version : lsb_release -a
 * Operating system : Linux
 * Distributor ID: Ubuntu
@@ -19,3 +21,16 @@ Host virtualization support :
 
 Host Kernel / Firmware details : 
 * These details are not needed for QEMU installation. QEMU runs in user space and it emulates the firmware for the guest. Hence, host kernel and firmware do not matter.
+
+
+## Installing QEMU on Ubuntu 22.04
+* sudo apt update
+* sudo apt install qemu qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils virt-manager -y
+* What these do:
+  qemu → base QEMU emulator binaries
+  qemu-kvm → enables KVM acceleration on your AMD-V CPU
+  libvirt-daemon-system + libvirt-clients → virtualization service (lets you manage VMs more easily)
+  bridge-utils → networking tools if you ever want your VM to use host networking
+  virt-manager → optional GUI manager (you may not use it, but it’s handy for testing)
+* Verify installation qemu-system-x86_64 --version => QEMU emulator version 6.2.0 (Debian 1:6.2+dfsg-2ubuntu6.26)
+* Verify KVM acceleration : kvm-ok => INFO: /dev/kvm exists ; KVM acceleration can be used
