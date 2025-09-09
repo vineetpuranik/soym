@@ -34,3 +34,34 @@ Host Kernel / Firmware details :
   virt-manager → optional GUI manager (you may not use it, but it’s handy for testing)
 * Verify installation qemu-system-x86_64 --version => QEMU emulator version 6.2.0 (Debian 1:6.2+dfsg-2ubuntu6.26)
 * Verify KVM acceleration : kvm-ok => INFO: /dev/kvm exists ; KVM acceleration can be used
+
+## QEMU Virtual PC setup
+                +------------------+
+                |   CPU (x86_64)   |
+                |  (AMD-V, KVM)    |
+                +------------------+
+                          |
+          ---------------------------------
+          |               |               |
+    +-----------+   +------------+   +-------------+
+    |   Memory  |   |    VGA     |   |   Keyboard  |
+    | (RAM/ROM) |   | (0xB8000)  |   | (I/O 0x60)  |
+    +-----------+   +------------+   +-------------+
+                          |
+          ---------------------------------
+          |               |
+    +-----------+   +----------------+
+    |   Timer   |   |   Serial Port   |
+    |   (PIT)   |   |  (I/O 0x3F8)   |
+    +-----------+   +----------------+
+
+| **Device**             | **Address / Ports**        | **Purpose / Significance**                                                   |
+| ---------------------- | -------------------------- | ---------------------------------------------------------------------------- |
+| **CPU**                | Reset vector: `0xFFFFFFF0` | Starts in 16-bit real mode; firmware must initialize and switch to 32/64-bit |
+| **VGA (Video)**        | `0xB8000` (text buffer)    | Write characters/colors directly to screen; simplest output method           |
+| **Keyboard (PS/2)**    | I/O port `0x60`            | Provides raw scancodes for key press/release events                          |
+| **Timer (PIT)**        | I/O ports `0x40–0x43`      | Generates periodic interrupts to drive the game loop                         |
+| **Serial Port (COM1)** | I/O port `0x3F8`           | Text I/O for debugging/logging; with `-serial stdio`, maps to host terminal  |
+
+
+
