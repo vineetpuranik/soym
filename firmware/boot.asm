@@ -1,84 +1,57 @@
 ; ================================
-; boot.asm - Minimal Firmware (Boot Sector)
+; boot.asm - Minimal Boot Sector
 ; ================================
 ; Purpose:
-;   This is the first code the CPU executes after BIOS/SeaBIOS loads the
-;   boot sector into memory at address 0x7C00. It demonstrates how firmware:
-;     1. Starts in 16-bit real mode.
-;     2. Sets up the stack (critical for safe execution).
-;     3. Writes directly to VGA video memory (0xB8000).
-;     4. Ends with the 0xAA55 signature so BIOS/QEMU recognizes it.
+;   This is the smallest possible boot sector that will:
+;     1. Be recognized by BIOS/QEMU as bootable (because of the 0xAA55 signature).
+;     2. Use BIOS interrupt 0x10 (video services) to print a single character ('X').
+;     3. Enter an infinite loop to keep the CPU from executing garbage.
+;
+;   This proves: our boot sector is valid and BIOS actually executes our code.
 
-BITS 16                 ; Tell assembler: emit 16-bit instructions.
-                        ; Why? At reset, x86 CPUs always start in "real mode".
-                        ; In real mode, CPU can only directly address 1 MB of memory
-                        ; using 16-bit segment:offset addressing (20-bit physical).
+BITS 16                 ; Assemble for 16-bit mode, since x86 CPUs always
+                        ; start in "real mode" after reset.
 
-ORG 0x7C00              ; ORG sets the origin address for this code.
-                        ; BIOS convention: the first sector (512 bytes) from bootable
-                        ; media is loaded into memory starting at physical address 0x7C00.
-                        ; Then CPU's instruction pointer is set to 0x7C00 and execution begins.
-                        ; This tells NASM: "assume our code will be loaded at 0x7C00".
+ORG 0x7C00              ; BIOS convention: it loads the boot sector (512 bytes)
+                        ; into physical memory at address 0x7C00, then jumps there.
+                        ; ORG tells the assembler to treat 0x7C00 as our starting offset.
 
 start:
     ; ------------------------------
-    ; Setup the stack
+    ; Print character using BIOS
     ; ------------------------------
-    ; Why is this necessary?
-    ;   - The stack is a reserved area of memory used for PUSH, POP, CALL, RET,
-    ;     interrupts, and local storage.
-    ;   - At reset, SS (Stack Segment) and SP (Stack Pointer) are undefined.
-    ;     If we don't set them, any stack operation could overwrite random memory.
-    ;   - Setting SS:SP ensures safe subroutine calls and interrupt handling.
+    ; We use BIOS interrupt 0x10, service 0x0E ("teletype output").
+    ; Inputs:
+    ;   AH = 0x0E → select teletype service.
+    ;   AL = ASCII code of character to print.
+    ;   BH = page number (default 0).
+    ;   BL = text attribute (for some video modes, ignored here).
+    ;
+    ; BIOS will:
+    ;   - Write the character in AL to the current cursor position.
+    ;   - Advance the cursor to the next position.
 
-    mov ax, 0x07C0       ; AX is a 16-bit general-purpose register.
-                         ; We temporarily use it to hold the segment value.
-                         ; Here we load 0x07C0, which will be assigned to SS.
-                         ; Why AX? Because x86 only allows moving immediates into SS via AX.
+    mov ah, 0x0e         ; Select BIOS teletype output function (INT 0x10, service 0x0E).
+    mov al, 'X'          ; ASCII code for 'X' (0x58).
+                         ; This is the character BIOS will draw on the screen.
 
-    mov ss, ax           ; SS (Stack Segment) = 0x07C0.
-                         ; Stack segment register defines the base segment for stack addresses.
-
-    mov sp, 0x7C00       ; SP (Stack Pointer) = 0x7C00.
-                         ; Stack pointer defines the current top-of-stack offset.
-                         ; Together, SS:SP = 0x07C0:0x7C00.
-                         ; Physical address = 0x07C0 * 16 + 0x7C00 = 0x7C00.
-                         ; This means stack grows down from the boot sector address.
-                         ; For our tiny example, this is fine, though normally you'd
-                         ; set the stack elsewhere in free RAM.
+    int 0x10             ; Trigger BIOS video interrupt 0x10.
+                         ; BIOS executes its teletype service and prints 'X'
+                         ; on the screen (usually right after "Booting from Hard Disk...").
 
     ; ------------------------------
-    ; Write a character to VGA memory
+    ; Halt by looping forever
     ; ------------------------------
-    ; Video memory in text mode is mapped starting at physical address 0xB8000.
-    ; Each screen cell = 2 bytes:
-    ;   Byte 0 = ASCII character.
-    ;   Byte 1 = Attribute (color info).
-    ; Example: "A" (0x41) with attribute 0x07 (grey on black) is stored as 41 07.
-
-    mov ah, 0x07         ; AH = high byte of AX.
-                         ; Attribute 0x07 means light grey foreground, black background.
-
-    mov al, 'O'          ; AL = low byte of AX.
-                         ; ASCII value of 'O' is 0x4F.
-                         ; Now AX = 0x074F → [AL=0x4F, AH=0x07].
-
-    mov [0xB8000], ax    ; Store AX into memory location 0xB8000.
-                         ; This writes two bytes:
-                         ;   AL (0x4F → 'O') at 0xB8000.
-                         ;   AH (0x07 → attribute) at 0xB8001.
-                         ; Result: "O" appears in top-left of screen in grey on black.
-
-hang:
-    jmp hang             ; Infinite loop to keep CPU here forever.
-                         ; Prevents execution from running into uninitialized memory.
+    ; After printing, we don't want CPU to continue into random memory.
+    ; So we jump to ourselves infinitely.
+    jmp $                ; "$" means "current address", so "jmp $" = infinite loop.
 
 ; ------------------------------
-; Boot sector padding and signature
+; Boot sector padding + signature
 ; ------------------------------
-times 510-($-$$) db 0    ; Fill the rest of the 512-byte boot sector with zeros
-                         ; up to byte 510 (to ensure correct size).
+times 510-($-$$) db 0    ; Pad file with zeros until we reach byte offset 510.
+                         ; This ensures the boot sector is exactly 512 bytes.
 
-dw 0xAA55                ; Mandatory boot signature: 0xAA55 (written little-endian).
-                         ; This occupies the last 2 bytes (511 and 512).
-                         ; BIOS/QEMU will only execute the sector if this marker exists.
+dw 0xAA55                ; Mandatory boot signature (little-endian).
+                         ; Bytes 511–512 contain 55h AAh.
+                         ; BIOS/QEMU checks this to decide if the sector is bootable.
