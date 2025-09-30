@@ -1,4 +1,4 @@
-# soym (myos spelled backwards)
+# soym
 
 ## Project goals
 
